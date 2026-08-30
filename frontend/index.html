@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Enterprise Analytics</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    body { background-color: #f4f7f6; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+    .card { background: #ffffff; padding: 40px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center; }
+    h2 { color: #1e3a8a; margin-bottom: 24px; font-size: 24px; }
+    .form-group { margin-bottom: 16px; text-align: left; }
+    input { width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; outline: none; transition: border-color 0.2s; }
+    input:focus { border-color: #2563eb; }
+    button { width: 100%; padding: 12px; background-color: #2563eb; color: #ffffff; border: none; border-radius: 6px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 8px; transition: background-color 0.2s; }
+    button:hover { background-color: #1d4ed8; }
+    .toggle-text { margin-top: 16px; font-size: 14px; color: #64748b; }
+    .toggle-text span { color: #2563eb; cursor: pointer; font-weight: 600; text-decoration: underline; }
+    .message { margin-top: 12px; font-size: 14px; color: #dc2626; }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <h2 id="form-title">Login</h2>
+    <form id="auth-form">
+      <div class="form-group">
+        <input type="email" id="email" placeholder="Email Address" required />
+      </div>
+      <div class="form-group">
+        <input type="password" id="password" placeholder="Password" required />
+      </div>
+      <button type="submit" id="submit-btn">Login</button>
+    </form>
+    
+    <div class="toggle-text">
+      <span id="toggle-link">Need an account? Sign Up</span>
+    </div>
+    <div id="message" class="message"></div>
+  </div>
+
+  <script>
+    let isLogin = true;
+    const formTitle = document.getElementById('form-title');
+    const submitBtn = document.getElementById('submit-btn');
+    const toggleLink = document.getElementById('toggle-link');
+    const authForm = document.getElementById('auth-form');
+    const messageDiv = document.getElementById('message');
+
+    toggleLink.addEventListener('click', () => {
+      isLogin = !isLogin;
+      formTitle.innerText = isLogin ? 'Login' : 'Sign Up';
+      submitBtn.innerText = isLogin ? 'Login' : 'Sign Up';
+      toggleLink.innerText = isLogin ? 'Need an account? Sign Up' : 'Already have an account? Login';
+      messageDiv.innerText = '';
+    });
+
+    authForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      
+      const endpoint = isLogin ? 'http://localhost:5000/api/login' : 'http://localhost:5000/api/signup';
+
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          if (isLogin) {
+            localStorage.setItem('token', data.token);
+            window.location.href = 'dashboard.html';
+          } else {
+            messageDiv.style.color = '#16a34a';
+            messageDiv.innerText = 'Account created successfully! Switch to Login.';
+          }
+        } else {
+          messageDiv.style.color = '#dc2626';
+          messageDiv.innerText = data.error || 'Operation failed.';
+        }
+      } catch (err) {
+        messageDiv.style.color = '#dc2626';
+        messageDiv.innerText = 'Unable to connect to server.';
+      }
+    });
+  </script>
+</body>
+</html>

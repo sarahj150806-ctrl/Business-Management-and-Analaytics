@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Enterprise Analytics Dashboard</title>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    body { background-color: #f4f7f6; color: #1e293b; padding: 20px; }
+    .container { max-width: 1000px; margin: 0 auto; }
+    header { display: flex; justify-content: space-between; align-items: center; background: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 24px; }
+    h2 { color: #1e3a8a; font-size: 22px; }
+    .btn-group { display: flex; gap: 10px; }
+    #logout-btn { background-color: #dc2626; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; }
+    #export-btn { background-color: #059669; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; display: none; }
+    .card { background: #ffffff; padding: 24px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 24px; }
+    .upload-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+    .upload-group label { display: block; font-weight: 600; margin-bottom: 8px; color: #475569; }
+    input[type="file"] { width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; background: #f8fafc; }
+    button.primary { background-color: #2563eb; color: white; border: none; padding: 12px 20px; border-radius: 6px; font-size: 16px; font-weight: 600; cursor: pointer; width: 100%; transition: background-color 0.2s; }
+    button.primary:hover { background-color: #1d4ed8; }
+    .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px; }
+    .stat-box { background: #f8fafc; padding: 16px; border-radius: 6px; border-left: 4px solid #2563eb; text-align: center; }
+    .stat-box h4 { font-size: 14px; color: #64748b; margin-bottom: 4px; }
+    .stat-box p { font-size: 18px; font-weight: 700; color: #1e293b; }
+    .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 24px 0; }
+    .chart-card { background: #ffffff; padding: 16px; border-radius: 8px; border: 1px solid #e2e8f0; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    th, td { padding: 12px; text-align: left; border-bottom: 1px solid #e2e8f0; font-size: 14px; }
+    th { background-color: #f8fafc; color: #475569; }
+    .error-msg { color: #dc2626; margin-top: 10px; font-size: 14px; }
+    @media print {
+      header, .upload-card, #export-btn { display: none !important; }
+      body { background: #fff; padding: 0; }
+      .card { box-shadow: none; border: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <h2>Enterprise Loss & Profit Engine</h2>
+      <div class="btn-group">
+        <button id="export-btn">Print / Export PDF</button>
+        <button id="logout-btn">Logout</button>
+      </div>
+    </header>
+
+    <div class="card upload-card">
+      <h3 style="margin-bottom: 16px; color: #1e3a8a;">Upload Comparison Data</h3>
+      <div class="upload-grid">
+        <div class="upload-group">
+          <label>Baseline File (Q1 Baseline)</label>
+          <input type="file" id="file1" accept=".csv, .xlsx, .xls" />
+        </div>
+        <div class="upload-group">
+          <label>Comparison File (Q2 Comparison)</label>
+          <input type="file" id="file2" accept=".csv, .xlsx, .xls" />
+        </div>
+      </div>
+      <button class="primary" id="analyze-btn">Run Loss & Profit Analysis</button>
+      <div id="error-msg" class="error-msg"></div>
+    </div>
+
+    <div class="card" id="results-card" style="display: none;">
+      <h3 style="margin-bottom: 16px; color: #1e3a8a;">Financial Performance Summary</h3>
+      <div class="summary-grid">
+        <div class="stat-box">
+          <h4>Revenue Variance</h4>
+          <p id="rev-var">-</p>
+        </div>
+        <div class="stat-box">
+          <h4>Cost Variance</h4>
+          <p id="cost-var">-</p>
+        </div>
+        <div class="stat-box">
+          <h4>Profit Variance</h4>
+          <p id="prof-var">-</p>
+        </div>
+      </div>
+
+      <!-- Chart Visualizations -->
+      <div class="chart-grid">
+        <div class="chart-card">
+          <h4 style="margin-bottom: 12px; color: #475569; text-align: center;">Variance Overview</h4>
+          <canvas id="barChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <h4 style="margin-bottom: 12px; color: #475569; text-align: center;">Financial Metrics Split</h4>
+          <canvas id="pieChart"></canvas>
+        </div>
+      </div>
+
+      <h3 style="margin: 24px 0 12px 0; color: #1e3a8a;">Identified Loss Causes & Corrective Actions</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Root Cause</th>
+            <th>Recommended Action</th>
+            <th>Profit Impact</th>
+          </tr>
+        </thead>
+        <tbody id="causes-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+  <div class="summary-grid" style="grid-template-columns: repeat(4, 1fr);">
+  <div class="stat-box">
+    <h4>Revenue Variance</h4>
+    <p id="rev-var">-</p>
+  </div>
+  <div class="stat-box">
+    <h4>Cost Variance</h4>
+    <p id="cost-var">-</p>
+  </div>
+  <div class="stat-box">
+    <h4>Profit Variance</h4>
+    <p id="prof-var">-</p>
+  </div>
+  <div class="stat-box" style="border-left-color: #9333ea;">
+    <h4>Projected Next Profit</h4>
+    <p id="pred-prof" style="color: #9333ea;">-</p>
+  </div>
+</div>
+
+  <script>
+    const token = localStorage.getItem('token');
+    if (!token) window.location.href = 'index.html';
+
+    document.getElementById('logout-btn').addEventListener('click', () => {
+      localStorage.removeItem('token');
+      window.location.href = 'index.html';
+    });
+
+    document.getElementById('export-btn').addEventListener('click', () => {
+      window.print();
+    });
+
+    let barChartInstance = null;
+    let pieChartInstance = null;
+
+    document.getElementById('analyze-btn').addEventListener('click', async () => {
+      const file1Input = document.getElementById('file1').files[0];
+      const file2Input = document.getElementById('file2').files[0];
+      const errorMsg = document.getElementById('error-msg');
+      const resultsCard = document.getElementById('results-card');
+      const exportBtn = document.getElementById('export-btn');
+
+      errorMsg.innerText = '';
+
+      if (!file1Input || !file2Input) {
+        errorMsg.innerText = 'Please select both baseline and comparison files.';
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('file1', file1Input);
+      formData.append('file2', file2Input);
+
+      try {
+        const response = await fetch('http://localhost:8000/api/compare', {
+          method: 'POST',
+          body: formData
+        });
+
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.detail || 'Analysis failed.');
+
+        // Update Summary Cards
+        const revVar = data.summary.revenue_variance;
+        const costVar = data.summary.cost_variance;
+        const profVar = data.summary.profit_variance;
+
+        document.getElementById('rev-var').innerText = revVar.toLocaleString();
+        document.getElementById('cost-var').innerText = costVar.toLocaleString();
+        document.getElementById('prof-var').innerText = profVar.toLocaleString();
+
+        // Render Table Rows
+        const tbody = document.getElementById('causes-tbody');
+        tbody.innerHTML = '';
+
+        if (data.loss_causes.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: #16a34a;">No negative profit variances detected!</td></tr>`;
+        } else {
+          data.loss_causes.forEach(item => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td><strong>${item.item}</strong></td>
+              <td>${item.reason}</td>
+              <td>${item.action}</td>
+              <td style="color: #dc2626; font-weight: 600;">${item.profit_change.toLocaleString()}</td>
+            `;
+            tbody.appendChild(tr);
+          });
+        }
+
+        // Render Interactive Charts
+        renderCharts(revVar, costVar, profVar);
+
+        resultsCard.style.display = 'block';
+        exportBtn.style.display = 'inline-block';
+      } catch (err) {
+        errorMsg.innerText = err.message;
+      }
+    });
+
+    function renderCharts(rev, cost, profit) {
+      if (barChartInstance) barChartInstance.destroy();
+      if (pieChartInstance) pieChartInstance.destroy();
+
+      const ctxBar = document.getElementById('barChart').getContext('2d');
+      barChartInstance = new Chart(ctxBar, {
+        type: 'bar',
+        data: {
+          labels: ['Revenue Var', 'Cost Var', 'Profit Var'],
+          datasets: [{
+            label: 'Amount ($)',
+            data: [rev, cost, profit],
+            backgroundColor: ['#2563eb', '#dc2626', profit >= 0 ? '#16a34a' : '#ea580c']
+          }]
+        },
+        options: { responsive: true, plugins: { legend: { display: false } } }
+      });
+
+      const ctxPie = document.getElementById('pieChart').getContext('2d');
+      pieChartInstance = new Chart(ctxPie, {
+        type: 'pie',
+        data: {
+          labels: ['Revenue Variance', 'Cost Variance'],
+          datasets: [{
+            data: [Math.abs(rev), Math.abs(cost)],
+            backgroundColor: ['#3b82f6', '#ef4444']
+          }]
+        },
+        options: { responsive: true }
+      });
+    }
+  </script>
+</body>
+</html>
