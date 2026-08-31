@@ -27,28 +27,62 @@ async def parse_file(file: UploadFile):
     else:
         raise HTTPException(status_code=400, detail="Invalid file format")
 
-@app.post("/api/compare")
-async def compare_files(
+@app.post("/api/analyze")
+async def analyze_files(
     file1: UploadFile = File(...),
-    file2: UploadFile = File(...),
+    file2: Optional[UploadFile] = File(None),
     item_col: Optional[str] = Form("Item"),
     revenue_col: Optional[str] = Form("Revenue"),
     cost_col: Optional[str] = Form("Cost")
 ):
     df1 = await parse_file(file1)
-    df2 = await parse_file(file2)
-
+    
     for col, name in [(item_col, 'Item'), (revenue_col, 'Revenue'), (cost_col, 'Cost')]:
-        if col not in df1.columns or col not in df2.columns:
-            raise HTTPException(
-                status_code=400, 
-                detail=f"Column '{col}' specified for {name} not found in uploaded files."
-            )
-
+        if col not in df1.columns:
+            raise HTTPException(status_code=400, detail=f"Column '{col}' specified for {name} not found in file 1.")
+            
     df1 = df1.rename(columns={item_col: 'Item', revenue_col: 'Revenue', cost_col: 'Cost'})
-    df2 = df2.rename(columns={item_col: 'Item', revenue_col: 'Revenue', cost_col: 'Cost'})
-
     df1['Profit'] = df1['Revenue'] - df1['Cost']
+    df1['Margin_%'] = np.where(df1['Revenue'] > 0, (df1['Profit'] / df1['Revenue']) * 100, 0)
+
+    # SINGLE FILE MODE
+    if file2 is None or file2.filename == "":
+        total_rev = float(df1['Revenue'].sum())
+        total_cost = float(df1['Cost'].sum())
+        total_profit = float(df1['Profit'].sum())
+        overall_margin = round((total_profit / total_rev * 100), 2) if total_rev > 0 else 0.0
+        
+        status = "PROFITABLE" if total_profit >= 0 else "IN LOSS"
+
+        loss_items = df1[df1['Profit'] < 0].copy()
+        loss_causes = []
+        for _, row in loss_items.iterrows():
+            loss_causes.append({
+                "item": str(row['Item']),
+                "profit": float(row['Profit']),
+                "reason": "Cost exceeds Revenue",
+                "action": "Increase item pricing or renegotiate supplier rates"
+            })
+
+        return {
+            "mode": "single",
+            "summary": {
+                "status": status,
+                "total_revenue": total_rev,
+                "total_cost": total_cost,
+                "total_profit": total_profit,
+                "profit_margin_percent": overall_margin,
+            },
+            "loss_causes": loss_causes
+        }
+
+    # DUAL FILE COMPARATIVE MODE
+    df2 = await parse_file(file2)
+    for col, name in [(item_col, 'Item'), (revenue_col, 'Revenue'), (cost_col, 'Cost')]:
+        if col not in df2.columns:
+            raise HTTPException(status_code=400, detail=f"Column '{col}' specified for {name} not found in file 2.")
+            
+    df2 = df2.rename(columns={item_col: 'Item', revenue_col: 'Revenue', cost_col: 'Cost'})
     df2['Profit'] = df2['Revenue'] - df2['Cost']
 
     rev1, rev2 = df1['Revenue'].sum(), df2['Revenue'].sum()
@@ -76,7 +110,9 @@ async def compare_files(
     next_profit_pred = float(model.predict(np.array([[3]]))[0])
 
     return {
+        "mode": "comparative",
         "summary": {
+            "status": "PROFITABLE" if prof2 >= 0 else "IN LOSS",
             "revenue_variance": float(rev2 - rev1),
             "cost_variance": float(cost2 - cost1),
             "profit_variance": float(prof2 - prof1),
